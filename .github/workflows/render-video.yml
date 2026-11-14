@@ -19,9 +19,14 @@
 #     subtitles and timing. Audio audibility is NOT verified by the
 #     40s run (see REPORT §9).
 #   - SHARDED RENDER (2026-11-15, speed round 2): the 2411 frames are
-#     split into 4 matrix jobs (~603 frames each, --frames=start-end),
-#     then one assemble job concatenates the 4 mp4s with ffmpeg
-#     (concat demuxer, -c copy). Locally verified 2026-11-15: each
+#     split into 4 matrix jobs (~603 frames each, --frames=start-end,
+#     --muted = video-only), then one assemble job concatenates the
+#     4 mp4s with ffmpeg (concat demuxer, -c copy) and muxes the
+#     single full voice file once. Video-only shards are required:
+#     audio-per-shard concatenated drifts the video ~5 frames (83ms)
+#     late by 35s (run 43620189265), because each shard mp4's
+#     container duration is ~19ms longer than its video (AAC
+#     priming) and the concat demuxer offsets by probed duration.
 #     shard renders exactly its frame range with audio trimmed to the
 #     range, concat gives the exact total frame count (120 frames for
 #     a 2-shard test), no duplicate/gap frame at the boundary
@@ -151,6 +156,15 @@ jobs:
       # 1809-2410. 10s: 0-139 / 140-279 / 280-419 / 420-556.
       # --frames renders exactly that range (inclusive, 0-indexed)
       # with audio trimmed to the range — verified locally 2026-11-15.
+      # --muted: shards are VIDEO-ONLY. Rendering audio per shard
+      # and concatenating it drifts the video ~5 frames (83ms) late
+      # by the end of the piece (run 43620189265: 35.0s frame matched
+      # the single-piece render's 34.9s frame, diff 0.07 vs 2.75
+      # same-timestamp; root cause: each shard mp4's container
+      # duration is ~19ms longer than its video because of AAC
+      # priming, and the concat demuxer offsets each following file
+      # by that probed duration). The assemble job muxes the single
+      # full voice file once, so video timestamps stay exact.
       - name: Compute shard range
         run: |
           PER=$(( (DURATION + 3) / 4 ))
@@ -175,11 +189,14 @@ jobs:
           --frames=$SHARD_START-$SHARD_END
           --codec=h264
           --concurrency=4
+          --muted
           --log=verbose
 
       # retention-days: 3 — artifact free storage is 500MB. The props
       # JSON is uploaded with every shard (identical content) so the
       # assemble job can put it in the final artifact, as before.
+      # The voice file is uploaded too (identical content) so the
+      # assemble job can mux the single full audio track once.
       - name: Upload shard video
         uses: actions/upload-artifact@v4
         with:
@@ -187,6 +204,7 @@ jobs:
           path: |
             remotion/out/shard-${{ matrix.shard }}.mp4
             remotion/day-0-props.json
+            remotion/public/voice.mp3
           retention-days: 3
 
   assemble:
@@ -246,15 +264,17 @@ jobs:
           merge-multiple: true
 
       # Concat demuxer with -c copy: no re-encode, no quality loss.
-      # Each shard's audio is already trimmed to its frame range, so
-      # the joined audio is the full 40.19s (plus the usual AAC
-      # priming, same as a single-piece render).
+      # Video-only shards have container durations exactly equal to
+      # their video (603/60 = 10.05s), so the concat offsets are
+      # exact and there is no timestamp drift (see the --muted note
+      # above; the audio-per-shard version drifted 5 frames by 35s).
+      # Audio is muxed once from the single full voice file.
       # upload-artifact strips the common path prefix (remotion/) from
       # the uploaded paths, so inside the downloaded artifact the
       # shards are at shards/out/shard-N.mp4 and the props JSON is at
       # shards/day-0-props.json (NOT shards/shard-N.mp4 — that path
       # broke the first sharded run, 43619735106).
-      - name: Concatenate shards
+      - name: Concatenate shards and mux audio
         run: |
           ls -lh shards/ shards/out/
           for i in 0 1 2 3; do
@@ -262,8 +282,10 @@ jobs:
             ffprobe -v error -show_entries format=duration -of csv=p=0 "shards/out/shard-$i.mp4"
             echo "file 'shards/out/shard-$i.mp4'" >> concat.txt
           done
+          test -f "shards/public/voice.mp3" || { echo "MISSING shards/public/voice.mp3"; exit 1; }
           mkdir -p out
-          ffmpeg -y -f concat -safe 0 -i concat.txt -c copy "out/$OUT_NAME"
+          ffmpeg -y -f concat -safe 0 -i concat.txt -c copy out/video-only.mp4
+          ffmpeg -y -i out/video-only.mp4 -i shards/public/voice.mp3 -map 0:v -map 1:a -c:v copy -c:a aac -b:a 128k -shortest "out/$OUT_NAME"
           ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_name,width,height,r_frame_rate -of default=noprint_wrappers=1 "out/$OUT_NAME"
 
       # retention-days: 3 — artifact free storage is 500MB; a ~1MB
