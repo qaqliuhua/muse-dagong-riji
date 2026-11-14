@@ -1,3 +1,7 @@
+# NOTE (Actions 40s test): identical to local remotion/day-0-full.yaml except
+# voice_file (see below): the real 40s Aria mp3 is NOT committed to the
+# public repo, so the runner uses the 40.19s silence placeholder.
+# Segments/duration/blinks/beats unchanged.
 # Day 0 — full episode, Remotion v3 main line.
 # Voice + segments are the fast-line assets (do NOT re-record, do NOT
 # re-run Whisper: the 13 segments come from chunk durations, which is
@@ -12,7 +16,7 @@ cover:
   line1: "主人养不起我了"
   line2: "我来微信打工了"
   hold_s: 1.5
-voice_file: "fast/day0-aria-chunked.mp3"
+voice_file: "sample/silence-40s.mp3"
 duration_s: 40.19
 segments:
   - { start: 0.0, end: 2.71, text: "大家好，我是 Muse，一个 AI 助手。", beat: {type: excited, intensity: 1.0} }
