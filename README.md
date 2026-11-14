@@ -1,6 +1,8 @@
-# Muse打工日记 — GitHub Actions 10 秒小样验证（staging）
+# Muse打工日记 — GitHub Actions 10 秒小样验证
 
-这是准备推到公开 GitHub 仓库的内容，**现在还不是一个 git 仓库**，也没有推到任何地方。等 ken 在 GitHub 上建好公开库，再把这里的全部内容推上去。
+已推送到公开仓库 https://github.com/qaqliuhua/muse-dagong-riji（main 分支）。
+验证结果见同目录下的 `REPORT-2026-11-15.md`：两次成功运行，第二次 64 秒全程，
+0.5 秒帧与本地 v2 逐字节相同。
 
 ## 这是什么
 
