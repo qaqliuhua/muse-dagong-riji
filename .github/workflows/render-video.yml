@@ -1,4 +1,4 @@
-# Render video — Muse打工日记 Day 0 10s test
+# Render video — Muse打工日记 Day 0 (10s sample / 40s full)
 # Source: Remotion official GitHub Actions example
 # (https://www.remotion.dev/docs/ssr/ — checkout → setup-node →
 #  npm i → npx remotion render → upload-artifact),
@@ -9,16 +9,32 @@
 #   - render uses the exact flags build-day.mjs uses locally, except
 #     --concurrency (local host is 1.5 CPU so it uses 1; the public
 #     ubuntu-latest runner has 4 vCPU, so 2 = half the cores)
-#   - only the 10s sample is rendered here; the 40s full version is
-#     a separate step after this test passes
+#   - workflow_dispatch input `version` selects 10s (day-0.yaml, 557
+#     frames) or 40s (day-0-full.yaml, 2411 frames); the 10s path is
+#     unchanged by this addition
+#   - 40s voice is 40.19s SILENCE (sample/silence-40s.mp3): the real
+#     40s Aria mp3 is NOT committed to the public repo, and
+#     workflow_dispatch has no file-upload input type, so a silent
+#     placeholder is the only clean way to verify the render chain,
+#     subtitles and timing. Audio audibility is NOT verified by the
+#     40s run (see REPORT §9).
 name: Render video
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Which version to render"
+        type: choice
+        required: true
+        default: "10s"
+        options:
+          - "10s"
+          - "40s"
 
 jobs:
   render:
-    name: Render Day 0 10s sample
+    name: Render Day 0 ${{ inputs.version }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +42,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+
+      # 10s: day-0.yaml, 557 frames, out/day0-10s-actions.mp4.
+      # 40s: day-0-full.yaml, 2411 frames (40.19s x 60fps),
+      # out/day0-full-actions.mp4. Everything else is identical.
+      - name: Select version
+        run: |
+          if [ "${{ inputs.version }}" = "40s" ]; then
+            echo "YAML_FILE=day-0-full.yaml" >> "$GITHUB_ENV"
+            echo "DURATION=2411" >> "$GITHUB_ENV"
+            echo "OUT_NAME=day0-full-actions.mp4" >> "$GITHUB_ENV"
+            echo "ARTIFACT_NAME=day0-full-actions" >> "$GITHUB_ENV"
+          else
+            echo "YAML_FILE=day-0.yaml" >> "$GITHUB_ENV"
+            echo "DURATION=557" >> "$GITHUB_ENV"
+            echo "OUT_NAME=day0-10s-actions.mp4" >> "$GITHUB_ENV"
+            echo "ARTIFACT_NAME=day0-10s-actions" >> "$GITHUB_ENV"
+          fi
+          cat "$GITHUB_ENV" | grep -E "YAML_FILE|DURATION|OUT_NAME|ARTIFACT_NAME"
 
       # node_modules is ~1.1GB (Remotion + React + Chrome Headless
       # Shell cache inside node_modules/.remotion). Cache it by
@@ -50,9 +84,9 @@ jobs:
       # sample/sample-10s-voice-aria-11x.mp3 to public/voice.mp3.
       # The --render flag is deliberately NOT used here: it hard-codes
       # --concurrency=1 for the 1.5-CPU local host.
-      - name: Generate props from day-0.yaml
+      - name: Generate props from YAML
         working-directory: remotion
-        run: node build-day.mjs day-0.yaml
+        run: node build-day.mjs $YAML_FILE
 
       # ubuntu-latest (now Ubuntu 26.04) ships NEITHER ffmpeg NOR any
       # CJK font: run 1 (2026-11-15) installed ffmpeg here (22s) but
@@ -69,18 +103,18 @@ jobs:
           ffmpeg -version | head -1
           fc-list | grep -ci "Noto Sans CJK"
 
-      # 9.281875s * 60fps = 557 frames. --duration overrides the
-      # hard-coded 557 in Root.tsx (same value here, but explicit so a
-      # future YAML change cannot be silently truncated — this bug bit
+      # --duration overrides the hard-coded 557 in Root.tsx (explicit
+      # so a YAML change cannot be silently truncated — this bug bit
       # the local full render once: the old --duration-in-frames flag
       # does not exist in Remotion 4 and was silently ignored).
-      - name: Render DayVideo (10s sample)
+      # 10s = 557 frames, 40s = 2411 frames (40.19s x 60fps).
+      - name: Render DayVideo
         working-directory: remotion
         run: >
           npx remotion render src/index.ts DayVideo
-          out/day0-10s-actions.mp4
+          out/$OUT_NAME
           --props=day-0-props.json
-          --duration=557
+          --duration=$DURATION
           --codec=h264
           --concurrency=2
           --log=verbose
@@ -91,8 +125,8 @@ jobs:
       - name: Upload video
         uses: actions/upload-artifact@v4
         with:
-          name: day0-10s-actions
+          name: ${{ env.ARTIFACT_NAME }}
           path: |
-            remotion/out/day0-10s-actions.mp4
+            remotion/out/${{ env.OUT_NAME }}
             remotion/day-0-props.json
           retention-days: 3
