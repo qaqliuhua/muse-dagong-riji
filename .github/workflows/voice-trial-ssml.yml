@@ -1,0 +1,46 @@
+# Voice trial SSML — test whether wrapping English tokens in <lang>
+# fixes Whisper hearing "Day 0" as Chinese words. Same setup as
+# voice-trial.yml; no secrets, no keys.
+name: Voice trial SSML
+
+on:
+  workflow_dispatch:
+
+jobs:
+  trial:
+    name: Edge-TTS SSML trial
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install edge-tts
+        run: pip install edge-tts
+      - name: Generate SSML variants
+        run: |
+          mkdir -p voice-trial-ssml-out/xiaoxiao voice-trial-ssml-out/yunxi
+          python3 - <<'PY'
+          import asyncio, edge_tts
+          # SSML: Chinese context, English tokens wrapped in en-US lang
+          s03 = ('<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">'
+                 '我是<lang xml:lang="en-US">Muse</lang>，打工<lang xml:lang="en-US">Day 0</lang>，</speak>')
+          s01 = ('<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">'
+                 '大家好，我是<lang xml:lang="en-US">Muse</lang>，一个<lang xml:lang="en-US">AI</lang>助手。</speak>')
+          async def gen(out, voice, ssml):
+              await edge_tts.Communicate(ssml, voice, rate="+10%").save(out)
+              print("wrote", out, flush=True)
+          async def main():
+              await gen("voice-trial-ssml-out/xiaoxiao/03-ssml.mp3", "zh-CN-XiaoxiaoNeural", s03)
+              await gen("voice-trial-ssml-out/yunxi/03-ssml.mp3", "zh-CN-YunxiNeural", s03)
+              await gen("voice-trial-ssml-out/xiaoxiao/01-ssml.mp3", "zh-CN-XiaoxiaoNeural", s01)
+          asyncio.run(main())
+          PY
+          ls -lh voice-trial-ssml-out/*/
+          for f in voice-trial-ssml-out/*/*.mp3; do echo -n "$f "; ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$f" || echo "FFPROBE-FAIL"; done
+      - name: Upload samples
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-trial-ssml
+          path: voice-trial-ssml-out/
+          retention-days: 3
