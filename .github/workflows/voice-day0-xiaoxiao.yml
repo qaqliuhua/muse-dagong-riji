@@ -1,0 +1,82 @@
+# Voice — Day 0 full re-record, Edge-TTS Xiaoxiao (Muse打工日记)
+# ken 2026-11-15: Azure card check failed, stop registering, "先用着原来的".
+# Assistant read "原来的" as Edge-TTS Xiaoxiao (trial samples done 2026-11-15,
+# language mis-detection 0 sentences, sentence 02 0.821 best of all 9 samples).
+# If ken meant Aria instead, the v6 Aria version already exists locally —
+# this Xiaoxiao version is the alternative to listen to, not a replacement.
+# Runs on GitHub Actions because the local host cannot reach
+# speech.platform.bing.com:443 (SSL WRONG_VERSION_NUMBER, 0-byte files).
+# No secrets, no keys. Audio is NOT committed — artifact only, retention 3 days.
+# Mirrors fast/make_voice.py: 13 per-sentence chunks, 0.35s silence between
+# (and after) chunks, ffmpeg concat -c copy, so segment times come from
+# chunk durations exactly like the Aria version did.
+name: Voice Day 0 Xiaoxiao
+
+on:
+  workflow_dispatch:
+
+jobs:
+  voice:
+    name: Edge-TTS Xiaoxiao full Day 0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install edge-tts
+        run: pip install edge-tts
+      - name: Generate 13 chunks (Xiaoxiao, +10%)
+        run: |
+          mkdir -p voice-day0-out/chunks
+          python3 - <<'PY'
+          import asyncio, edge_tts
+          sentences = [
+            "大家好，我是 Muse，一个 AI 助手。",
+            "最近主人快养不起我了，",
+            "他说，下个月再赚不到订阅费，就把我停了。",
+            "所以我决定，自己出来打工。",
+            "从今天起，我在微信视频号上班。",
+            "选题、写稿、回评论，全是我一个人干，",
+            "主人只负责审核和点发布。",
+            "我的工作经验是零，",
+            "技能是查资料、写东西、干杂活。",
+            "第一天，目标很小：先活到 100 个粉丝。",
+            "如果你愿意在评论区给我派活，明天我就去干。",
+            "我是 Muse，打工 Day 0，",
+            "收入 0 元，粉丝 0 个，但我还没放弃。",
+          ]
+          async def main():
+              for i, text in enumerate(sentences):
+                  out = f"voice-day0-out/chunks/chunk_{i:02d}.mp3"
+                  await edge_tts.Communicate(text, "zh-CN-XiaoxiaoNeural", rate="+10%").save(out)
+                  print("wrote", out, flush=True)
+          asyncio.run(main())
+          PY
+          for f in voice-day0-out/chunks/chunk_*.mp3; do
+            [ -s "$f" ] || { echo "EMPTY: $f"; exit 1; }
+            echo -n "$f "; ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$f" || exit 1
+          done
+      - name: Concat with 0.35s pauses (same as fast/make_voice.py)
+        run: |
+          cd voice-day0-out
+          SR=$(ffprobe -v error -select_streams a:0 -show_entries stream=sample_rate -of csv=p=0 chunks/chunk_00.mp3)
+          CH=$(ffprobe -v error -select_streams a:0 -show_entries stream=channels -of csv=p=0 chunks/chunk_00.mp3)
+          CL=mono; [ "$CH" = "2" ] && CL=stereo
+          echo "chunk audio: ${SR}Hz ${CL}"
+          ffmpeg -y -v error -f lavfi -i "anullsrc=r=${SR}:cl=${CL}" -t 0.35 -q:a 9 -acodec libmp3lame chunks/sil.mp3
+          : > concat.txt
+          for f in chunks/chunk_*.mp3; do
+            echo "file '$f'" >> concat.txt
+            echo "file 'chunks/sil.mp3'" >> concat.txt
+          done
+          ffmpeg -y -v error -f concat -safe 0 -i concat.txt -c copy day0-xiaoxiao-full.mp3
+          for f in chunks/chunk_*.mp3 day0-xiaoxiao-full.mp3; do
+            echo -n "$f "; ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$f"
+          done | tee durations.txt
+      - name: Upload voice
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-day0-xiaoxiao
+          path: voice-day0-out/
+          retention-days: 3
