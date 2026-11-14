@@ -26,6 +26,8 @@ jobs:
           python-version: "3.12"
       - name: Install edge-tts
         run: pip install edge-tts
+      - name: Install ffmpeg (ffprobe needed for chunk checks + concat)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - name: Generate 13 chunks (Xiaoxiao, +10%)
         run: |
           mkdir -p voice-day0-out/chunks
