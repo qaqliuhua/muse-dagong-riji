@@ -1,0 +1,53 @@
+# Voice trial — Edge-TTS Chinese voices (Muse打工日记)
+# Runs on GitHub Actions because the local host cannot reach
+# speech.platform.bing.com:443 (SSL WRONG_VERSION_NUMBER, 0-byte files).
+# No secrets, no keys. Generates only the 3 worst sentences (see
+# voice-subs-diagnosis-2026-11-14.md) in 2 Chinese-native voices.
+name: Voice trial (Edge-TTS)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  trial:
+    name: Edge-TTS trial
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install edge-tts
+        run: pip install edge-tts
+      - name: Generate 3 sentences x 2 voices
+        run: |
+          mkdir -p voice-trial-out/xiaoxiao voice-trial-out/yunxi
+          python3 - <<'PY'
+          import asyncio, edge_tts
+          sentences = {
+            "01": "大家好，我是 Muse，一个 AI 助手。",
+            "02": "我的工作经验是零，",
+            "03": "我是 Muse，打工 Day 0，",
+          }
+          voices = {
+            "xiaoxiao": "zh-CN-XiaoxiaoNeural",
+            "yunxi": "zh-CN-YunxiNeural",
+          }
+          async def gen(voice_dir, voice, sid, text):
+              out = f"voice-trial-out/{voice_dir}/{sid}.mp3"
+              await edge_tts.Communicate(text, voice, rate="+10%").save(out)
+              print("wrote", out, flush=True)
+          async def main():
+              for vdir, voice in voices.items():
+                  for sid, text in sentences.items():
+                      await gen(vdir, voice, sid, text)
+          asyncio.run(main())
+          PY
+          ls -lh voice-trial-out/xiaoxiao voice-trial-out/yunxi
+          for f in voice-trial-out/*/*.mp3; do echo -n "$f "; ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$f" || echo "FFPROBE-FAIL"; done
+      - name: Upload samples
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-trial-edge-tts
+          path: voice-trial-out/
+          retention-days: 3
