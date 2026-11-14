@@ -4,9 +4,9 @@
 // except the 10s Day 0 defaults in Root.tsx.
 import React from "react";
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { Ball } from "./Ball";
+import { Ball, BeatSpec } from "./Ball";
 
-export type Segment = { start: number; end: number; text: string };
+export type Segment = { start: number; end: number; text: string; beat?: BeatSpec };
 
 export type DayProps = {
   day: number;
@@ -55,14 +55,24 @@ export const DayVideo: React.FC<DayProps> = (props) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
+  // SUBTITLE (v3 fix, 2026-11-15): segments have 0.35s gaps between
+  // them (silence between chunks). The old code fell back to the LAST
+  // segment in a gap, so every pause flashed "收入 0 元，粉丝 0 个，
+  // 但我还没放弃。" — 12 gaps, 4.2s total, confirmed on 2.9s / 35.3s
+  // frames. Now a gap HOLDS the previous line (like a human caption:
+  // the line lingers while the speaker pauses). Hiding the box in
+  // gaps was rejected: the box would pop in/out 12 times a video.
+  // After the last segment ends, holding it is correct — it IS the
+  // final line, not a spoiler. Before the first segment, show it.
   const seg =
     props.segments.find((s) => t >= s.start && t < s.end) ??
-    props.segments[props.segments.length - 1];
+    [...props.segments].reverse().find((s) => s.end <= t) ??
+    props.segments[0];
   const lines = wrap(seg.text, 13);
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#E4EEFF", fontFamily: "'Noto Sans CJK SC','Noto Sans CJK','PingFang SC',sans-serif" }}>
-      <Ball frame={frame} fps={fps} blinkStarts={props.blinkStarts} />
+      <Ball frame={frame} fps={fps} blinkStarts={props.blinkStarts} segments={props.segments} />
       {/* top tag pill */}
       <div
         style={{

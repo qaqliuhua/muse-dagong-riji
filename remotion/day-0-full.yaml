@@ -1,29 +1,30 @@
-# NOTE (Actions 40s test): identical to local remotion/day-0-full.yaml except
-# voice_file (see below). Segments/duration/blinks unchanged.
-# Day 0 — full episode, Remotion v2 main line.
+# Day 0 — full episode, Remotion v3 main line.
 # Voice + segments are the fast-line assets (do NOT re-record, do NOT
 # re-run Whisper: the 13 segments come from chunk durations, which is
 # the fix for Whisper dropping "我是 Muse，打工 Day 0，" at ~35s).
-# Spin stays at its v2 hard-coded 6.0-7.2s (mid 3rd line, same as v1 sample).
+# Spin stays at its v2 timing 6.0-7.2s (mid 3rd line, same as v1 sample),
+# now as a beat: segment 2 start 5.14 + offset 0.86 = 6.0s.
+# v3 beats: one action per segment (see remotion/src/Ball.tsx).
+# Times are NOT changed — only `beat:` annotations were added.
 day: 0
 title: "Day 0｜主人养不起我了，我来微信打工了"
 cover:
   line1: "主人养不起我了"
   line2: "我来微信打工了"
   hold_s: 1.5
-voice_file: "sample/silence-40s.mp3"  # TEST ONLY: 40.19s silence. Real 40s Aria mp3 is NOT committed to the public repo (see REPORT §9); voice is injected later once ken picks a new Chinese voice.
+voice_file: "fast/day0-aria-chunked.mp3"
 duration_s: 40.19
 segments:
-  - { start: 0.0, end: 2.71, text: "大家好，我是 Muse，一个 AI 助手。" }
-  - { start: 3.06, end: 4.79, text: "最近主人快养不起我了，" }
-  - { start: 5.14, end: 7.47, text: "他说，下个月再赚不到订阅费，就把我停了。" }
-  - { start: 7.82, end: 10.29, text: "所以我决定，自己出来打工。" }
-  - { start: 10.64, end: 13.45, text: "从今天起，我在微信视频号上班。" }
-  - { start: 13.8, end: 16.44, text: "选题、写稿、回评论，全是我一个人干，" }
-  - { start: 16.79, end: 19.16, text: "主人只负责审核和点发布。" }
-  - { start: 19.51, end: 21.96, text: "我的工作经验是零，" }
-  - { start: 22.31, end: 25.38, text: "技能是查资料、写东西、干杂活。" }
-  - { start: 25.73, end: 28.88, text: "第一天，目标很小：先活到 100 个粉丝。" }
-  - { start: 29.23, end: 32.47, text: "如果你愿意在评论区给我派活，明天我就去干。" }
-  - { start: 32.82, end: 35.19, text: "我是 Muse，打工 Day 0，" }
-  - { start: 35.54, end: 39.14, text: "收入 0 元，粉丝 0 个，但我还没放弃。" }
+  - { start: 0.0, end: 2.71, text: "大家好，我是 Muse，一个 AI 助手。", beat: {type: excited, intensity: 1.0} }
+  - { start: 3.06, end: 4.79, text: "最近主人快养不起我了，", beat: {type: droop, intensity: 1.0} }
+  - { start: 5.14, end: 7.47, text: "他说，下个月再赚不到订阅费，就把我停了。", beat: {type: spin, intensity: 1.0, offset: 0.86} }
+  - { start: 7.82, end: 10.29, text: "所以我决定，自己出来打工。", beat: {type: excited, intensity: 0.9} }
+  - { start: 10.64, end: 13.45, text: "从今天起，我在微信视频号上班。", beat: {type: nod, intensity: 0.7} }
+  - { start: 13.8, end: 16.44, text: "选题、写稿、回评论，全是我一个人干，", beat: {type: busy, intensity: 0.9} }
+  - { start: 16.79, end: 19.16, text: "主人只负责审核和点发布。", beat: {type: look, intensity: 0.8, dir: 1} }
+  - { start: 19.51, end: 21.96, text: "我的工作经验是零，", beat: {type: droop, intensity: 0.9} }
+  - { start: 22.31, end: 25.38, text: "技能是查资料、写东西、干杂活。", beat: {type: proud, intensity: 0.8} }
+  - { start: 25.73, end: 28.88, text: "第一天，目标很小：先活到 100 个粉丝。", beat: {type: hop, intensity: 0.8} }
+  - { start: 29.23, end: 32.47, text: "如果你愿意在评论区给我派活，明天我就去干。", beat: {type: nod, intensity: 0.9} }
+  - { start: 32.82, end: 35.19, text: "我是 Muse，打工 Day 0，", beat: {type: proud, intensity: 0.9} }
+  - { start: 35.54, end: 39.14, text: "收入 0 元，粉丝 0 个，但我还没放弃。", beat: {type: proud, intensity: 1.0, offset: 2.4} }
