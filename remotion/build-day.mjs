@@ -53,9 +53,39 @@ const segments = cfg.segments ?? parseSrt(cfg.segments_file);
 const durationS = cfg.duration_s ?? segments[segments.length - 1].end;
 const durationInFrames = Math.round(durationS * 60);
 
-// Deterministic blink schedule (v5 rule: 3.5-5s apart).
+// Deterministic blink schedule (v4, 2026-11-15).
+// v3 was 3.6 + k*4.3s, 0.48s each — and the 3.6s blink fell inside the
+// droop beat (3.06-4.79s), where the eyes were already squinting, so on
+// a phone it looked like the ball never blinked at all. v4: candidates
+// every ~3.2s from 1.6s, each 0.60s in Ball.tsx (0.20s close to 0.02,
+// 0.12s HOLD closed, 0.28s open). A candidate that lands inside a
+// squint-beat window (excited / droop / wide, beat start .. +1.3s) or
+// a spin window is shifted +1.2s once, so a blink is never masked by
+// a squint. Minimum gap 2.0s between blinks. Same input -> same list.
+const SQUINT = new Set(["excited", "droop", "wide"]);
+const squintWindows = [];
+const spinWindows = [];
+for (const seg of segments) {
+  const beats = [seg.beat, ...((seg.beat && seg.beat.subs) || [])].filter(Boolean);
+  for (const b of beats) {
+    const bs = seg.start + (b.offset ?? 0);
+    if (SQUINT.has(b.type)) squintWindows.push([bs, bs + 1.3]);
+    if (b.type === "spin" || b.type === "spin2") {
+      const dur = b.type === "spin2" ? 2.0 : 0.8;
+      spinWindows.push([bs - 0.2, bs + dur + 0.18 + 1.6]);
+    }
+  }
+}
+const inWin = (x, wins) => wins.some(([a, b]) => x >= a && x <= b);
 const blinkStarts = [];
-for (let s = 3.6; s < durationS - 1; s += 4.3) blinkStarts.push(+s.toFixed(2));
+for (let c = 1.6; c < durationS - 1; c += 3.2) {
+  let s = +c.toFixed(2);
+  if (inWin(s, squintWindows) || inWin(s, spinWindows)) s = +(s + 1.2).toFixed(2);
+  if (blinkStarts.length && s < blinkStarts[blinkStarts.length - 1] + 2.0) {
+    s = +(blinkStarts[blinkStarts.length - 1] + 2.0).toFixed(2);
+  }
+  if (s < durationS - 1) blinkStarts.push(s);
+}
 
 const props = {
   day,

@@ -14,10 +14,10 @@ const day0: DayProps = {
   tag: "Muse打工日记 · Day 0",
   footer: "AI 生成内容 · Remotion 重写版",
   segments: [
-    { start: 0.0, end: 2.08, text: "大家好，我是 Muse，一个 AI 助手。", beat: { type: "excited", intensity: 1.0 } },
-    { start: 2.08, end: 3.8, text: "最近主人快养不起我了，", beat: { type: "droop", intensity: 1.0 } },
+    { start: 0.0, end: 2.08, text: "大家好，我是 Muse，一个 AI 助手。", beat: { type: "bigjump", intensity: 1.0, subs: [{ type: "wide", offset: 1.2, intensity: 0.9 }] } },
+    { start: 2.08, end: 3.8, text: "最近主人快养不起我了，", beat: { type: "droop", intensity: 1.0, subs: [{ type: "look", offset: 0.9, dir: -1, intensity: 0.7 }] } },
     { start: 3.8, end: 6.86, text: "他说，下个月再赚不到订阅费，就把我停了。", beat: { type: "spin", intensity: 1.0, offset: 2.2 } },
-    { start: 6.86, end: 9.281875, text: "所以我决定，自己出来打工。", beat: { type: "excited", intensity: 0.9 } },
+    { start: 6.86, end: 9.281875, text: "所以我决定，自己出来打工。", beat: { type: "dance", intensity: 0.9, subs: [{ type: "bigjump", offset: 1.1, intensity: 0.9 }] } },
   ],
   voiceFile: "voice.mp3",
 };

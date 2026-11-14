@@ -1,6 +1,6 @@
 # Day 0 — 10s verification sample for the Remotion rewrite.
 # Times from faster-whisper on the Aria 1.1x voice, text from script.
-# v3 beats: same actions as the first 4 segments of day-0-full.yaml
+# v4 beats: same actions as the first 4 segments of day-0-full.yaml
 # (spin: segment 2 start 3.8 + offset 2.2 = 6.0s, the v2 timing).
 # Times are NOT changed — only `beat:` annotations were added.
 day: 0
@@ -12,7 +12,7 @@ cover:
 voice_file: "sample/sample-10s-voice-aria-11x.mp3"
 duration_s: 9.281875
 segments:
-  - { start: 0.0, end: 2.08, text: "大家好，我是 Muse，一个 AI 助手。", beat: {type: excited, intensity: 1.0} }
-  - { start: 2.08, end: 3.8, text: "最近主人快养不起我了，", beat: {type: droop, intensity: 1.0} }
+  - { start: 0.0, end: 2.08, text: "大家好，我是 Muse，一个 AI 助手。", beat: {type: bigjump, intensity: 1.0, subs: [{type: wide, offset: 1.2, intensity: 0.9}]} }
+  - { start: 2.08, end: 3.8, text: "最近主人快养不起我了，", beat: {type: droop, intensity: 1.0, subs: [{type: look, offset: 0.9, dir: -1, intensity: 0.7}]} }
   - { start: 3.8, end: 6.86, text: "他说，下个月再赚不到订阅费，就把我停了。", beat: {type: spin, intensity: 1.0, offset: 2.2} }
-  - { start: 6.86, end: 9.281875, text: "所以我决定，自己出来打工。", beat: {type: excited, intensity: 0.9} }
+  - { start: 6.86, end: 9.281875, text: "所以我决定，自己出来打工。", beat: {type: dance, intensity: 0.9, subs: [{type: bigjump, offset: 1.1, intensity: 0.9}]} }
