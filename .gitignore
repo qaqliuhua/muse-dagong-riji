@@ -1,0 +1,7 @@
+# Generated / local-only — never commit
+node_modules/
+out/
+.tmp/
+*.mp4
+day-*-props.json
+public/voice.mp3
