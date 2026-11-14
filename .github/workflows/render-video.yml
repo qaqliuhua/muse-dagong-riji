@@ -116,7 +116,7 @@ jobs:
           --props=day-0-props.json
           --duration=$DURATION
           --codec=h264
-          --concurrency=2
+          --concurrency=4
           --log=verbose
 
       # retention-days: 3 — artifact free storage is 500MB; a ~1MB
