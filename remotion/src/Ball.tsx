@@ -91,17 +91,60 @@
 // - HIGHLIGHT: radialGradient, small (rx 50, ry 30) at the upper-left
 //   rim (cx 390, cy 710), plus a tiny dot at (465, 655). It does NOT
 //   rotate with the spin.
+// V6 (ken feedback 2026-11-15: "眼睛还有问题" — after v5).
+// Diagnosis first (measured on v5 40s frames, connected-component
+// method, white threshold R>=245 & G>=245, eye band y 780-1100):
+//   - v5 bars render 112-122w x 28-32h, w/h 3.5-4.1, height only
+//     5-6% of the 620px ball; centre-to-centre 232-249px (38% of ball
+//     width); inner gap 120-128px — WIDER than one eye (112-122px).
+//     Enlarged, they are two thin pills floating on flat blue with a
+//     huge gap: they read as "— —", closed / asleep / blank, worse on
+//     a phone. A horizontal line IS the pictogram for a closed eye.
+//   - At the 38.0s land squash the bars stretch to 183x20, w/h 9.2 —
+//     at the climax moment the eyes are literally slits, because the
+//     eye group inherits the ball's 1.6x/0.62 squash.
+//   - GrokBot's corrected main ball uses upright "II" (vertical bars,
+//     never rotating); the dancing ball uses horizontal "==". Day 0's
+//     slanted 45° capsules were later treated as a defect ("不要画成
+//     斜眼"). GrokBot has NO pupils either, so "no pupil" cannot be
+//     the main cause — shape is. Position is fine (eyes 27-74px above
+//     ball centre, upper-middle, as in the original).
+//   So v6 tries, side by side, two upright schemes (same code, one
+//   constant each):
+//     (a) "ii" — GrokBot-corrected main ball: thin vertical bars
+//         42x116, dx 95 (span 232px, 37% of ball width);
+//     (b) "capsule" — taller rounded capsule, v3's 110x150 made
+//         upright and closer: 96x150, dx 92 (span 280px, 45%; inner
+//         gap 88px ≈ one eye width, classic face proportion).
+//   Both keep: ball round 1:1, ONE shared parameter set mirrored,
+//   eyes NEVER rotate with tilt (v5 fix kept), blink = scaleY -> 0.06
+//   for 0.28s (two bars flatten to thin dashes — the reference blink
+//   shape, no dx convergence any more: vertical bars must NOT merge
+//   into one line), and counter-squash: the eye scale is divided by
+//   the ball's squash, so the eyes keep their shape while the ball
+//   flattens (38.0s eyes must NOT be 9:1 slits again).
 // - eyes: two identical capsules, 110 x 150, centres at x = 540 +/- 118,
 //   y = 860. Gaze moves BOTH eyes together — never one eye.
+//   (v6: see EYE_DIM below — the frozen 110x150 is now scheme (b).)
 import React from "react";
 
 export const BALL_CX = 540;
 export const BALL_CY = 920;
 export const BALL_R = 310;
-const EYE_W = 116; // eye bar width ("==" bars, v5-corrected)
-const EYE_BAR_H = 36; // eye bar height
-const EYE_Y = 860; // eye centre y
-const EYE_DX = 118; // eye centre offset from ball centre x
+// v6 eye geometry — ONE constant per candidate scheme (see header).
+// Flip EYE_MODE to render the other scheme; nothing else changes.
+type EyeMode = "ii" | "capsule";
+const EYE_MODE: EyeMode = "capsule";
+const EYE_DIM = {
+  // (a) GrokBot-corrected main ball: thin vertical bars "II".
+  ii: { w: 42, h: 116, dx: 95, y: 860 },
+  // (b) Taller rounded capsule, v3's 110x150 made upright + closer.
+  capsule: { w: 96, h: 150, dx: 92, y: 855 },
+}[EYE_MODE];
+const EYE_W = EYE_DIM.w;
+const EYE_H = EYE_DIM.h;
+const EYE_DX = EYE_DIM.dx; // eye centre offset from ball centre x
+const EYE_Y = EYE_DIM.y; // eye centre y
 
 // Piecewise keyframe interpolation with smoothstep easing per segment.
 // pts: [[time_s, value], ...] sorted by time. Clamped outside the range.
@@ -156,12 +199,12 @@ function pulse(t: number, start: number, dur: number): number {
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 // v5-corrected blink (browser-verified GrokBot 眨眼⑤号):
-// "两横合为一条细横线、0.25-0.3 秒" — the two horizontal eye bars
-// flatten and converge into ONE thin horizontal line. Total 0.28s:
-// close 0.10s (scaleY 1 -> 0.06, dx 118 -> ~18), hold 0.06s, open
-// 0.12s. Starts come from build-day.mjs (~3.2s apart, 12 in 40s).
-// The v4 0.60s blink is gone: the reference blink is short on purpose,
-// and visibility now comes from the flatten+converge, not duration.
+// "两横合为一条细横线、0.25-0.3 秒" — for the v5 horizontal bars
+// the two bars flattened and converged into ONE thin line. v6 keeps
+// the 0.28s timing and the flatten (scaleY 1 -> 0.06, hold, open),
+// but the eyes are now vertical: each eye flattens in place into a
+// thin dash, with NO dx convergence — vertical bars must not merge
+// into one line. Starts come from build-day.mjs (~3.2s apart).
 export function blinkScaleY(frame: number, fps: number, starts: number[] = [1.6, 4.8, 8.1]): number {
   for (const s of starts) {
     const t = frame / fps - s;
@@ -564,30 +607,32 @@ export const Ball: React.FC<{
             {/* tiny secondary highlight dot, near the top rim */}
             <ellipse cx={465} cy={655} rx={15} ry={9} fill="url(#hlDot)" />
           </g>
-          {/* EYES v5-corrected — two horizontal white bars ("=="),
-              ALWAYS upright: they translate and squash with the ball,
-              but NEVER rotate with tilt (there are no spins at all).
-              One shared parameter set, mirrored by construction.
-              No pupils, no happy/sad/wide shapes, no lids, no blue
-              mask — the bars never change shape. Blink = both bars
-              flatten (scaleY -> 0.06) and converge (dx 118 -> ~18)
-              into ONE thin horizontal line, 0.28s (see blinkScaleY).
-              wide/excited only change bar THICKNESS (eyeSY), never
-              the shape. */}
+          {/* EYES v6 — two upright eyes, ONE shared parameter set,
+              mirrored by construction. They translate and squash with
+              the ball, but NEVER rotate with tilt (v5 fix kept, no
+              spins exist). Blink = both eyes flatten (scaleY -> 0.06)
+              into thin dashes for 0.28s (see blinkScaleY); there is
+              NO dx convergence any more — vertical bars must not
+              merge into one line. Counter-squash: the eye scale is
+              divided by the ball's squash, so the eyes keep their
+              shape while the ball flattens at a landing (v5's 38.0s
+              eyes were 183x20, w/h 9.2 — slits). wide/excited only
+              change eye thickness (eyeSY), never the shape. */}
           {[-EYE_DX, EYE_DX].map((dx) => {
-            const eyeDx = dx * (1 - 0.85 * blinkDepth);
-            const eyeCx = BALL_CX + eyeDx;
+            const eyeCx = BALL_CX + dx;
+            const eyeSX = clamp(totalEyeSX / totalSqX, 0.02, 2);
+            const eyeSY = clamp((blink * totalEyeSY) / totalSqY, 0.02, 2);
             return (
               <g
                 key={dx}
-                transform={`translate(${eyeCx + gazeX} ${EYE_Y + gazeY}) scale(${totalEyeSX.toFixed(3)} ${(blink * totalEyeSY).toFixed(3)}) translate(${-eyeCx} ${-EYE_Y})`}
+                transform={`translate(${eyeCx + gazeX} ${EYE_Y + gazeY}) scale(${eyeSX.toFixed(3)} ${eyeSY.toFixed(3)}) translate(${-eyeCx} ${-EYE_Y})`}
               >
                 <rect
                   x={eyeCx - EYE_W / 2}
-                  y={EYE_Y - EYE_BAR_H / 2}
+                  y={EYE_Y - EYE_H / 2}
                   width={EYE_W}
-                  height={EYE_BAR_H}
-                  rx={EYE_BAR_H / 2}
+                  height={EYE_H}
+                  rx={Math.min(EYE_W, EYE_H) / 2}
                   fill="#FFFFFF"
                 />
               </g>
