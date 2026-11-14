@@ -54,14 +54,20 @@ jobs:
         working-directory: remotion
         run: node build-day.mjs day-0.yaml
 
-      # ubuntu-latest images ship ffmpeg, but fail fast with a clear
-      # message instead of a cryptic Remotion error if it ever goes away.
-      - name: Check ffmpeg
+      # ubuntu-latest (now Ubuntu 26.04) ships NEITHER ffmpeg NOR any
+      # CJK font: run 1 (2026-11-15) installed ffmpeg here (22s) but
+      # every Chinese character still rendered as tofu boxes, because
+      # DayVideo.tsx asks for 'Noto Sans CJK SC' / 'Noto Sans CJK' /
+      # 'PingFang SC' and the runner has none of them. The ball itself
+      # was pixel-identical to local v2 (mean channel diff 0.41/255),
+      # so this step is the only fix needed: install fonts-noto-cjk
+      # alongside ffmpeg, in the same apt-get update.
+      - name: Check ffmpeg and install CJK fonts
         run: |
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get update && sudo apt-get install -y ffmpeg
-          fi
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
           ffmpeg -version | head -1
+          fc-list | grep -ci "Noto Sans CJK"
 
       # 9.281875s * 60fps = 557 frames. --duration overrides the
       # hard-coded 557 in Root.tsx (same value here, but explicit so a
