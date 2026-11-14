@@ -43,6 +43,47 @@
 //     (excited/droop/wide) and spin windows, so a blink is never
 //     masked by a squint. Plus a tiny nod rides each blink.
 //
+// V5 (ken feedback 2026-11-15: "舞台太单一了，眼睛那边有问题"):
+// v4's eyes were still wrong in three measured frames:
+//   - 1.0s normal eye: a plain white capsule, no pupil, no life;
+//   - 20.0s sad: the ball-blue lid rect is drawn INSIDE the eye group,
+//     which rotates with the ball's droop tilt (-12° about the ball
+//     centre), so the lid's horizontal edge cuts the two capsules at
+//     different heights — measured left eye centre-y 967 vs right 926.5
+//     (Δcy 40.5px, widths identical 112px). It reads as the eyes melting;
+//   - 25.0s (end of the 720° spin): the whole eye group rotates with
+//     spinAngle, so the eyes are two slanted ellipses, one 81px higher
+//     than the other (measured Δcy 81px; mid-spin at 6.6s Δcy 174px).
+//   Root cause in both cases: the eyes were children of the ball's
+//   rotate() groups.
+//
+// V5-CORRECTED (2026-11-15, browser-verified GrokBot Day 0,
+// BV1o9J96eEmY 59s — this REPLACES the first v5 draft's assumptions):
+// The browser watch showed the original is NOT "eyes always changing
+// expression, many scenes". Day 0 is: ONE light grey-white room, fixed
+// camera, no scene cuts; the ball rolls right along a white winding
+// road, bounces 1/4-1/2 ball diameter, lands squashed 1.6x wide +
+// ripple; eyes are just two white bars at ~45° that NEVER change, NEVER
+// blink, and roll WITH the ball; liveliness comes from the road +
+// ground ring + per-sentence popup cards + typed big text. The slanted
+// bars were later treated as a defect INSIDE the series: later videos
+// switch the main ball to upright "II" bars, and 眨眼⑤号 defines blink
+// as "two horizontals merge into one thin horizontal line, 0.25-0.3s,
+// DO NOT draw slanted eyes". So v5-corrected copies the CORRECTED
+// original, not the Day 0 slanted bars:
+//   - eyes = two horizontal white bars ("=="), 116x36, ALWAYS upright:
+//     they translate with the ball but never rotate with tilt (there
+//     are no spins at all now — dance/spin/spin2/shake deleted);
+//   - blink = both bars flatten (scaleY -> 0.06) and converge
+//     (dx 118 -> ~18) into ONE thin horizontal line, 0.28s total,
+//     ~3.2s apart, 12 in 40s (build-day.mjs schedule unchanged);
+//   - NO pupils, NO happy/sad/wide shapes, NO blue lid: the v5-draft
+//     pupil + sad-path + happy-arc are all deleted;
+//   - motion = road drift (-180 -> +220px over 40s) + bounce (-155px)
+//     + land (1.6x-wide squash + ripple rings + pink stars) + motion
+//     smear ghosts; emotion comes from squash, bounce, roll speed and
+//     the cards, exactly like the original.
+//
 // Frozen look (unchanged since v2):
 // - round blob, perfect circle, Muse blue #2A92FE, light-blue eyes #EAF3FF
 // - ball centre (540, 920), radius 310. Aspect ratio is 1:1 EXCEPT for
@@ -57,8 +98,8 @@ import React from "react";
 export const BALL_CX = 540;
 export const BALL_CY = 920;
 export const BALL_R = 310;
-const EYE_W = 110;
-const EYE_H = 150;
+const EYE_W = 116; // eye bar width ("==" bars, v5-corrected)
+const EYE_BAR_H = 36; // eye bar height
 const EYE_Y = 860; // eye centre y
 const EYE_DX = 118; // eye centre offset from ball centre x
 
@@ -78,10 +119,21 @@ function keys(t: number, pts: [number, number][]): number {
   return pts[pts.length - 1][1];
 }
 
-// --- Beats (v3, extended in v4) ---
+// --- Beats (v5-corrected, 2026-11-15 browser measurement) ---
+// The reference Day 0 has NO dance, NO full spin, NO head shake:
+// the ball rolls along the road, bounces 1/4-1/2 ball diameter, and
+// lands with a 1.6x-wide squash + ripple. So dance / spin / spin2 /
+// shake are deleted; new types are bounce (a 155px bounce, ~1/4 ball
+// diameter) and land (a big jump whose LANDING squashes 1.6x wide,
+// with ripple rings + pink stars — the original's 42s landing).
+// Eye expressions are gone too: the reference eyes never change shape
+// (two white bars, no pupils, no happy/sad/wide) — emotion comes from
+// squash, bounce, roll speed and the cards. Beats still move the BODY
+// (hop/sink/tilt/gaze), and wide/excited still modulate eye BAR
+// thickness, but no beat ever changes the eye SHAPE.
 export type BeatType =
-  | "hop" | "excited" | "nod" | "droop" | "proud" | "look" | "busy" | "wide" | "spin"
-  | "dance" | "slide" | "bigjump" | "spin2" | "shake";
+  | "hop" | "excited" | "nod" | "droop" | "proud" | "look" | "busy" | "wide" | "slide"
+  | "bigjump" | "bounce" | "land";
 export type BeatSpec = {
   type?: BeatType;
   intensity?: number; // 0-1, scales amplitude (default 1)
@@ -103,24 +155,24 @@ function pulse(t: number, start: number, dur: number): number {
 }
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-// v4 blink: close 0.20s to 0.02 (a real closed line, not 0.08),
-// HOLD closed 0.12s so a phone viewer actually registers it,
-// open 0.28s. Total 0.60s (v3 was 0.48s with no hold).
-// Starts come from build-day.mjs, which now spaces them ~3.2s apart
-// and keeps them OUT of squint-beat and spin windows.
+// v5-corrected blink (browser-verified GrokBot 眨眼⑤号):
+// "两横合为一条细横线、0.25-0.3 秒" — the two horizontal eye bars
+// flatten and converge into ONE thin horizontal line. Total 0.28s:
+// close 0.10s (scaleY 1 -> 0.06, dx 118 -> ~18), hold 0.06s, open
+// 0.12s. Starts come from build-day.mjs (~3.2s apart, 12 in 40s).
+// The v4 0.60s blink is gone: the reference blink is short on purpose,
+// and visibility now comes from the flatten+converge, not duration.
 export function blinkScaleY(frame: number, fps: number, starts: number[] = [1.6, 4.8, 8.1]): number {
   for (const s of starts) {
     const t = frame / fps - s;
-    if (t < 0 || t >= 0.6) continue;
-    if (t < 0.2) {
-      // close, 200ms, ease-in: 1 -> 0.02
-      const k = t / 0.2;
-      return 1 - 0.98 * k * k;
+    if (t < 0 || t >= 0.28) continue;
+    if (t < 0.1) {
+      const k = t / 0.1;
+      return 1 - 0.94 * k * k;
     }
-    if (t < 0.32) return 0.02; // hold closed — this is what makes it visible
-    // open, 280ms, ease-out: 0.02 -> 1
-    const k = (t - 0.32) / 0.28;
-    return 0.02 + 0.98 * (1 - (1 - k) * (1 - k));
+    if (t < 0.16) return 0.06; // hold closed — one thin line
+    const k = (t - 0.16) / 0.12;
+    return 0.06 + 0.94 * (1 - (1 - k) * (1 - k));
   }
   return 1;
 }
@@ -150,11 +202,11 @@ function gazeKeys(t: number, axis: "x" | "y"): number {
 type Channels = {
   hop: number; sink: number; tilt: number; moveX: number;
   sqX: number; sqY: number; eyeSX: number; eyeSY: number;
-  gazeX: number; gazeY: number; happy: number; sad: number;
+  gazeX: number; gazeY: number;
 };
 const zeroCh = (): Channels => ({
   hop: 0, sink: 0, tilt: 0, moveX: 0, sqX: 1, sqY: 1,
-  eyeSX: 1, eyeSY: 1, gazeX: 0, gazeY: 0, happy: 0, sad: 0,
+  eyeSX: 1, eyeSY: 1, gazeX: 0, gazeY: 0,
 });
 
 // One beat's contribution to the channels at time t. `s` is the beat's
@@ -183,14 +235,56 @@ function applyBeat(ch: Channels, type: BeatType, I: number, s: number, t: number
         [s, 1], [s + 0.15, 1.08], [s + 0.45, 0.94], [s + 0.85, 1.09],
         [s + 1.15, 0.98], [s + 1.3, 1],
       ]);
-      ch.happy += 0.6 * I * pulse(t, s, 0.95);
+      break;
+    }
+    case "bounce": {
+      // the reference bounce: 1/4-1/2 ball diameter (155-310px). Ours:
+      // -155px with a firm landing squash, then a smaller rebound hop.
+      ch.hop += keys(t, [
+        [s, 0], [s + 0.2, 12], [s + 0.6, -155 * I], [s + 1.0, 0],
+        [s + 1.25, -38 * I], [s + 1.55, 0], [s + 1.7, 0],
+      ]);
+      ch.sqY *= keys(t, [
+        [s, 1], [s + 0.18, 0.85], [s + 0.5, 1.08], [s + 0.95, 0.8],
+        [s + 1.1, 0.8], [s + 1.28, 1.05], [s + 1.45, 0.96], [s + 1.7, 1],
+      ]);
+      ch.sqX *= keys(t, [
+        [s, 1], [s + 0.18, 1.08], [s + 0.5, 0.95], [s + 0.95, 1.16],
+        [s + 1.1, 1.16], [s + 1.28, 0.97], [s + 1.45, 1.02], [s + 1.7, 1],
+      ]);
+      break;
+    }
+    case "land": {
+      // the reference 42s landing: a big jump, then the ball flattens
+      // to a horizontal ellipse ~1.6x as wide as tall, + ripple rings
+      // + pink stars (rings/stars are drawn in the component from the
+      // landing time landT = s + 0.85). Squash here is the BODY squash;
+      // the ripple is separate.
+      ch.hop += keys(t, [
+        [s, 0], [s + 0.18, 10], [s + 0.55, -120 * I], [s + 0.85, 0], [s + 1.3, 0],
+      ]);
+      // The ball drifts right along the road all video (drift +200 by
+      // 38s), so a 1.6x squash would bleed ~140px off the right edge
+      // (measured on the 38.0s frame of the first 40s render). The jump
+      // therefore carries the ball back to centre stage (moveX -190)
+      // and it rolls back along the road after the landing.
+      ch.moveX += keys(t, [
+        [s, 0], [s + 0.5, -190 * I], [s + 1.3, -190 * I], [s + 2.0, 0],
+      ]);
+      ch.sqY *= keys(t, [
+        [s, 1], [s + 0.15, 0.86], [s + 0.45, 1.1], [s + 0.85, 0.62],
+        [s + 1.0, 0.62], [s + 1.15, 1.05], [s + 1.3, 1],
+      ]);
+      ch.sqX *= keys(t, [
+        [s, 1], [s + 0.15, 1.08], [s + 0.45, 0.94], [s + 0.85, 1.6],
+        [s + 1.0, 1.6], [s + 1.15, 0.97], [s + 1.3, 1],
+      ]);
       break;
     }
     case "excited": {
       const e2 = pulse(t, s, 0.55) + 0.85 * pulse(t, s + 0.45, 0.55);
       ch.hop -= 40 * I * e2;
-      // happy ARC eyes (both together) + a squint on the capsule underneath
-      ch.happy += 0.9 * I * Math.min(1, e2);
+      // eye bars get thinner (a squint) — shape never changes
       ch.eyeSY *= 1 - 0.25 * I * Math.min(1, e2);
       ch.eyeSX *= 1 + 0.12 * I * Math.min(1, e2);
       ch.sqY *= 1 + 0.05 * e;
@@ -206,7 +300,6 @@ function applyBeat(ch: Channels, type: BeatType, I: number, s: number, t: number
       ch.sink += 45 * I * e;
       ch.tilt -= 12 * I * e;
       ch.gazeY += 24 * I * e;
-      ch.sad += 0.85 * I * e; // ball-blue lid over the top of both eyes
       ch.eyeSY *= 1 - 0.1 * e;
       ch.sqY *= 1 - 0.07 * e;
       break;
@@ -240,29 +333,46 @@ function applyBeat(ch: Channels, type: BeatType, I: number, s: number, t: number
       ch.gazeX += 20 * I * dir * pulse(t, s, 1.5);
       break;
     }
-    case "dance": {
-      // side-to-side shimmy, Grok celebrate style: 3 swings + 2 hops
-      ch.moveX += keys(t, [
-        [s, 0], [s + 0.28, 85 * I], [s + 0.55, -85 * I], [s + 0.82, 85 * I],
-        [s + 1.1, -45 * I], [s + 1.4, 0],
-      ]);
-      ch.hop -= 45 * I * (pulse(t, s, 0.5) + 0.8 * pulse(t, s + 0.55, 0.5));
-      ch.happy += 0.8 * I * pulse(t, s, 1.4);
-      ch.sqY *= 1 - 0.06 * I * (pulse(t, s, 0.5) + pulse(t, s + 0.55, 0.5));
-      break;
-    }
-    case "shake": {
-      // embarrassed / "no no" shake: rapid ±12px, 6Hz, 0.7s
-      const env = pulse(t, s, 0.7);
-      ch.moveX += 12 * I * Math.sin((t - s) * 2 * Math.PI * 6) * env;
-      ch.tilt += 3 * I * Math.sin((t - s) * 2 * Math.PI * 6) * env;
-      ch.eyeSY *= 1 + 0.2 * I * env;
-      break;
-    }
-    case "spin":
-    case "spin2":
-      break; // spins have their own timeline below
   }
+}
+
+type FlatBeat = { start: number; spec: BeatSpec };
+function flatBeats(segments: BeatSegment[]): FlatBeat[] {
+  const flat: FlatBeat[] = [];
+  for (const seg of segments) {
+    const b = seg.beat ?? { type: "nod" as BeatType, intensity: 0.55 };
+    flat.push({ start: seg.start + (b.offset ?? 0), spec: b });
+    for (const sub of b.subs ?? []) {
+      flat.push({ start: seg.start + (sub.offset ?? 0), spec: sub });
+    }
+  }
+  return flat;
+}
+
+// Ball centre at time tt, for the motion-smear ghosts. Same beat math
+// as the main render, re-run at an earlier time. Valid only because v5
+// has no spins: spin hop/squash are always 0, so they are skipped here.
+function centerAt(tt: number, flat: FlatBeat[]): { x: number; y: number } {
+  const ch = zeroCh();
+  for (const fb of flat) {
+    const spec = fb.spec;
+    const type = spec.type ?? "nod";
+    const I = clamp(spec.intensity ?? 1, 0, 1);
+    if (type === "look") {
+      const dir = spec.dir ?? 1;
+      const e = pulse(tt, fb.start, 1.15);
+      if (e > 0) ch.moveX += 18 * I * dir * e;
+      continue;
+    }
+    applyBeat(ch, type, I, fb.start, tt, spec.dir ?? 1);
+  }
+  const swayX = 20 * Math.sin((2 * Math.PI * tt) / 5.0) + 8 * Math.sin((2 * Math.PI * tt) / 2.3 + 1);
+  const swayY = 7 * Math.sin((2 * Math.PI * tt) / 3.7 + 0.5);
+  const driftX = clamp(-180 + 10 * tt, -180, 220);
+  return {
+    x: BALL_CX + swayX + driftX + ch.moveX,
+    y: BALL_CY + ch.hop + ch.sink + swayY,
+  };
 }
 
 export const Ball: React.FC<{
@@ -270,7 +380,8 @@ export const Ball: React.FC<{
   fps: number;
   blinkStarts?: number[];
   segments?: BeatSegment[];
-}> = ({ frame, fps, blinkStarts, segments = [] }) => {
+  ballScale?: number; // v5 camera: scene-driven ball size (default 1)
+}> = ({ frame, fps, blinkStarts, segments = [], ballScale = 1 }) => {
   const t = frame / fps;
   // Breathing: uniform scale only, period 4s, ±2.0% (v3 was ±1.4%).
   const breath = 1 + 0.02 * Math.sin((2 * Math.PI * t) / 4.0);
@@ -283,21 +394,12 @@ export const Ball: React.FC<{
   const gazeY0 = gazeKeys(t, "y");
 
   // --- Flatten beats: main beat + subs, each with an absolute start. ---
-  type FlatBeat = { start: number; spec: BeatSpec };
-  const flat: FlatBeat[] = [];
-  for (const seg of segments) {
-    const b = seg.beat ?? { type: "nod" as BeatType, intensity: 0.55 };
-    flat.push({ start: seg.start + (b.offset ?? 0), spec: b });
-    for (const sub of b.subs ?? []) {
-      flat.push({ start: seg.start + (sub.offset ?? 0), spec: sub });
-    }
-  }
+  const flat: FlatBeat[] = flatBeats(segments);
 
   const ch = zeroCh();
   for (const fb of flat) {
     const spec = fb.spec;
     const type = spec.type ?? "nod";
-    if (type === "spin" || type === "spin2") continue;
     const I = clamp(spec.intensity ?? 1, 0, 1);
     if (type === "look") {
       // look is the only beat whose dir handling is inline (gaze + lean)
@@ -314,79 +416,12 @@ export const Ball: React.FC<{
     applyBeat(ch, type, I, fb.start, t, spec.dir ?? 1);
   }
 
-  // --- Spins (v2 timeline, generalised to N spins, v4 adds a 2nd) ---
-  // Each spin: anticipation ss-0.2..ss (crouch + windup -15°),
-  // spin ss..ss+dur (dur = 0.8s per turn, angle -> turns*360+18°),
-  // settle +0.18s back to turns*360, then a dizzy wobble for ~1.5s
-  // (Grok spinDizzy: post-spin tilt oscillation ±17° decaying).
-  // Base angle = 360° per spin already finished, so spin 2 starts
-  // where spin 1 ended instead of snapping back to 0.
-  type SpinBeat = { ss: number; turns: number };
-  const spins: SpinBeat[] = flat
-    .filter((fb) => fb.spec.type === "spin" || fb.spec.type === "spin2")
-    .map((fb) => ({ ss: fb.start, turns: fb.spec.type === "spin2" ? 2 : 1 }))
-    .sort((a, b) => a.ss - b.ss);
-  let spinAngle = 0;
-  let spinHop = 0;
-  let spinSqX = 1;
-  let spinSqY = 1;
-  let spinLag = 0;
-  let spinEyeSX = 1;
-  let spinEyeSY = 1;
-  let spinTiltWobble = 0;
-  let spinDizzy = 0;
-  let completedTurns = 0;
-  for (const sp of spins) {
-    const dur = 0.8 * sp.turns + (sp.turns > 1 ? 0.6 : 0);
-    const end = sp.ss + dur + 0.18;
-    if (t >= end) {
-      completedTurns += sp.turns;
-      continue;
-    }
-    if (t < sp.ss - 0.2) continue;
-    // this spin is active (or in its wobble tail)
-    const total = sp.turns * 360;
-    spinAngle = keys(t, [
-      [sp.ss - 0.2, 0], [sp.ss, -15], [sp.ss + dur, total + 18],
-      [end, total], [end + 1.6, total],
-    ]);
-    spinHop = keys(t, [
-      [sp.ss, 0], [sp.ss + dur / 2, -50], [sp.ss + dur, 0], [end + 1.6, 0],
-    ]);
-    spinSqY = keys(t, [
-      [sp.ss - 0.2, 1], [sp.ss, 0.92], [sp.ss + 0.15, 1.04],
-      [sp.ss + dur - 0.1, 1.0], [sp.ss + dur + 0.02, 0.88],
-      [sp.ss + dur + 0.15, 0.88], [sp.ss + dur + 0.28, 1.03],
-      [sp.ss + dur + 0.42, 0.985], [sp.ss + dur + 0.6, 1],
-    ]);
-    spinSqX = keys(t, [
-      [sp.ss - 0.2, 1], [sp.ss, 1.06], [sp.ss + 0.15, 0.97],
-      [sp.ss + dur - 0.1, 1.0], [sp.ss + dur + 0.02, 1.09],
-      [sp.ss + dur + 0.15, 1.09], [sp.ss + dur + 0.28, 0.98],
-      [sp.ss + dur + 0.42, 1.01], [sp.ss + dur + 0.6, 1],
-    ]);
-    spinLag = keys(t, [
-      [sp.ss, 0], [sp.ss + dur / 2, -10], [sp.ss + dur, 0],
-      [sp.ss + dur + 0.16, 5], [sp.ss + dur + 0.4, 0],
-    ]);
-    spinEyeSX = keys(t, [
-      [sp.ss, 1], [sp.ss + 0.1, 1], [sp.ss + 0.3, 1.14],
-      [sp.ss + dur - 0.15, 1.14], [sp.ss + dur, 1],
-    ]);
-    spinEyeSY = keys(t, [
-      [sp.ss, 1], [sp.ss + 0.1, 1], [sp.ss + 0.3, 0.9],
-      [sp.ss + dur - 0.15, 0.9], [sp.ss + dur, 1],
-    ]);
-    if (t > end) {
-      // dizzy wobble after the spin (stronger for the double spin)
-      const dt = t - end;
-      const env = Math.exp(-dt * 1.8) * Math.max(0, 1 - dt / 1.5);
-      spinTiltWobble = 8 * (sp.turns >= 2 ? 1 : 0.4) * env * Math.sin(dt * 9);
-      spinDizzy = 0.3 * env;
-    }
-    break; // only one spin can be active at a time (Day 0 spins are 16s apart)
-  }
-  spinAngle += completedTurns * 360;
+  // --- Land events (v5-corrected): the reference 42s landing. ---
+  // landT = when the ball touches down (beat start + 0.85s). Ripple
+  // rings + pink stars are drawn from landT in the JSX below.
+  const landTimes: number[] = flat
+    .filter((fb) => fb.spec.type === "land")
+    .map((fb) => fb.start + 0.85);
 
   const blink = blinkScaleY(frame, fps, blinkStarts);
   // A blink reads as a gesture, not just an eye flicker: a tiny nod
@@ -395,18 +430,33 @@ export const Ball: React.FC<{
   const blinkNod = blinkDepth > 0.4 ? 8 * blinkDepth : 0;
 
   // Combined channels — still ONE shared value per eye, mirrored.
-  const totalHop = spinHop + ch.hop;
+  // Squash clamp is wide (0.6-1.65) on purpose: the land squash is
+  // 1.6x wide / 0.62 tall, and the old 0.82-1.15 clamp would eat it.
+  const totalHop = ch.hop;
   const totalSink = ch.sink + blinkNod;
-  const totalMoveX = swayX + ch.moveX;
-  const totalSqX = clamp(spinSqX * ch.sqX, 0.82, 1.15);
-  const totalSqY = clamp(spinSqY * ch.sqY, 0.82, 1.15);
-  const totalEyeSX = clamp(spinEyeSX * ch.eyeSX, 0.8, 1.3);
-  const totalEyeSY = clamp(spinEyeSY * ch.eyeSY * (1 - spinDizzy), 0.02, 1.3);
+  // Road drift (v5-corrected): the ball rolls right along the road,
+  // -180px at t=0 to +220px at t=40 (10px/s). The road dashes scroll
+  // the other way in DayVideo, so the roll reads even when the ball
+  // is near the edge of the frame.
+  const driftX = clamp(-180 + 10 * t, -180, 220);
+  const totalMoveX = swayX + driftX + ch.moveX;
+  const totalSqX = clamp(ch.sqX, 0.6, 1.65);
+  const totalSqY = clamp(ch.sqY, 0.6, 1.15);
+  const totalEyeSX = clamp(ch.eyeSX, 0.8, 1.3);
+  const totalEyeSY = clamp(ch.eyeSY, 0.02, 1.3);
   const gazeX = clamp(gazeX0 + ch.gazeX, -36, 36);
   const gazeY = clamp(gazeY0 + ch.gazeY, -26, 30);
-  const happy = clamp(ch.happy, 0, 1);
-  const sad = clamp(ch.sad, 0, 1);
-  const totalTilt = ch.tilt + spinTiltWobble;
+  const totalTilt = ch.tilt;
+
+  // --- Motion smear (v5-corrected "运动加残影") ---
+  // Ghost balls at t-0.05s / t-0.10s: the same beat math, re-run at an
+  // earlier time (no spins exist in v5, so the helper only needs the
+  // beat channels + sway + drift). Drawn only while actually moving
+  // fast, so still frames stay clean.
+  const ghost1 = centerAt(t - 0.05, flat);
+  const ghost2 = centerAt(t - 0.1, flat);
+  const ballCX = BALL_CX + totalMoveX;
+  const ballCY = BALL_CY + totalHop + totalSink + swayY;
 
   // Ground shadow follows the ball sideways and the jump: smaller +
   // fainter in the air, wider on crouch / landing squash.
@@ -437,6 +487,11 @@ export const Ball: React.FC<{
           <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.75" />
           <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
         </radialGradient>
+        {/* ghosts are motion smear, not a second ball: blur them so a
+            fast vertical jump reads as a smear, not a pale halo */}
+        <filter id="ghostBlur" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="7" />
+        </filter>
       </defs>
       {/* ground shadow — follows the ball sideways now (v4: it travels) */}
       <ellipse
@@ -446,69 +501,98 @@ export const Ball: React.FC<{
         ry={36}
         fill={`rgba(20,60,140,${shadowOpacity.toFixed(3)})`}
       />
+      {/* pink dashed ground ring (v5-corrected, from the original) */}
+      <ellipse
+        cx={shadowCx}
+        cy={1420}
+        rx={shadowRx + 52}
+        ry={52}
+        fill="none"
+        stroke="#FF9EBB"
+        strokeWidth={4}
+        strokeDasharray="10 12"
+        opacity={0.8}
+      />
+      {/* landing ripple rings + pink stars (v5-corrected, 42s landing) */}
+      {landTimes.map((landT) => {
+        const dt = t - landT;
+        if (dt < 0 || dt > 0.8) return null;
+        const k = dt / 0.8;
+        const starOp = dt < 0.6 ? 1 - dt / 0.6 : 0;
+        const stars: [number, number][] = [[-260, -120], [260, -140], [-330, 60], [330, 40], [0, -210]];
+        return (
+          <g key={landT}>
+            <ellipse cx={shadowCx} cy={1420} rx={140 + 260 * k} ry={20 + 34 * k} fill="none" stroke="#2A92FE" strokeWidth={5} opacity={(0.5 * (1 - k)).toFixed(3)} />
+            <ellipse cx={shadowCx} cy={1420} rx={90 + 200 * k} ry={14 + 26 * k} fill="none" stroke="#FF9EBB" strokeWidth={4} opacity={(0.45 * (1 - k)).toFixed(3)} />
+            {stars.map(([sx, sy], i) => (
+              <path
+                key={i}
+                d={`M ${shadowCx + sx} ${1420 + sy - 26} L ${shadowCx + sx + 8} ${1420 + sy - 8} L ${shadowCx + sx + 26} ${1420 + sy} L ${shadowCx + sx + 8} ${1420 + sy + 8} L ${shadowCx + sx} ${1420 + sy + 26} L ${shadowCx + sx - 8} ${1420 + sy + 8} L ${shadowCx + sx - 26} ${1420 + sy} L ${shadowCx + sx - 8} ${1420 + sy - 8} Z`}
+                fill="#FF9EBB"
+                opacity={starOp.toFixed(3)}
+              />
+            ))}
+          </g>
+        );
+      })}
+      {/* motion smear: ghost balls 0.05s / 0.10s behind, only while moving fast */}
+      {[
+        { c: ghost1, op: 0.07, min: 10 },
+        { c: ghost2, op: 0.04, min: 20 },
+      ].map(({ c, op, min }, i) => {
+        const d = Math.hypot(c.x - ballCX, c.y - ballCY);
+        if (d < min) return null;
+        return <circle key={i} cx={c.x} cy={c.y} r={BALL_R} fill="#2A92FE" opacity={op} filter="url(#ghostBlur)" />;
+      })}
       <g transform={`translate(${totalMoveX.toFixed(2)} ${(totalHop + totalSink + swayY).toFixed(2)})`}>
         <g
-          transform={`translate(${BALL_CX} ${BALL_CY}) rotate(${totalTilt.toFixed(2)}) scale(${(breath * totalSqX).toFixed(4)} ${(breath * totalSqY).toFixed(4)}) translate(${-BALL_CX} ${-BALL_CY})`}
+          transform={`translate(${BALL_CX} ${BALL_CY}) scale(${(ballScale * breath * totalSqX).toFixed(4)} ${(ballScale * breath * totalSqY).toFixed(4)}) translate(${-BALL_CX} ${-BALL_CY})`}
         >
           {/* the ball: one perfect circle */}
           <circle cx={BALL_CX} cy={BALL_CY} r={BALL_R} fill="#2A92FE" />
-          {/* highlight: small, soft, upper-left rim, ABOVE the eyes.
-              It does NOT rotate with the spin — it is light. */}
-          <ellipse
-            cx={390}
-            cy={710}
-            rx={50}
-            ry={30}
-            fill="url(#hlMain)"
-            transform={`rotate(-25 390 710)`}
-          />
-          {/* tiny secondary highlight dot, near the top rim */}
-          <ellipse cx={465} cy={655} rx={15} ry={9} fill="url(#hlDot)" />
-          {/* eyes rotate WITH the ball, but with their own lag +
-              mid-spin stretch, so they are not glued rigidly. */}
-          <g transform={`rotate(${spinAngle} ${BALL_CX} ${BALL_CY})`}>
-            <g transform={`translate(${gazeX} ${gazeY}) rotate(${spinLag} ${BALL_CX} ${BALL_CY})`}>
-              {[-EYE_DX, EYE_DX].map((dx) => (
-                <g
-                  key={dx}
-                  transform={`translate(${BALL_CX + dx} ${EYE_Y}) scale(${totalEyeSX.toFixed(3)} ${(blink * totalEyeSY).toFixed(3)}) translate(${-(BALL_CX + dx)} ${-EYE_Y})`}
-                >
-                  {/* v4 eye expressions — all THREE shapes share the same
-                      parameters for both eyes (mirrored by construction):
-                      capsule (normal), ∩ arc (happy, crossfades in),
-                      ball-blue lid over the top (sad). Blink scales the
-                      whole group, so a blink during a happy arc still
-                      closes both eyes together. */}
-                  <rect
-                    x={BALL_CX + dx - EYE_W / 2}
-                    y={EYE_Y - EYE_H / 2}
-                    width={EYE_W}
-                    height={EYE_H}
-                    rx={EYE_W / 2}
-                    fill="#EAF3FF"
-                    opacity={(1 - happy).toFixed(3)}
-                  />
-                  <path
-                    d={`M ${BALL_CX + dx - 52} ${EYE_Y + 12} A 52 52 0 0 1 ${BALL_CX + dx + 52} ${EYE_Y + 12}`}
-                    stroke="#EAF3FF"
-                    strokeWidth={34}
-                    fill="none"
-                    strokeLinecap="round"
-                    opacity={happy.toFixed(3)}
-                  />
-                  <rect
-                    x={BALL_CX + dx - EYE_W / 2}
-                    y={EYE_Y - EYE_H / 2}
-                    width={EYE_W}
-                    height={58}
-                    rx={18}
-                    fill="#2A92FE"
-                    opacity={(sad * 0.95).toFixed(3)}
-                  />
-                </g>
-              ))}
-            </g>
+          {/* highlight: small, soft, upper-left rim. It leans with the
+              ball (totalTilt) but never spins — it is light, not paint. */}
+          <g transform={`rotate(${totalTilt.toFixed(2)} ${BALL_CX} ${BALL_CY})`}>
+            <ellipse
+              cx={390}
+              cy={710}
+              rx={50}
+              ry={30}
+              fill="url(#hlMain)"
+              transform={`rotate(-25 390 710)`}
+            />
+            {/* tiny secondary highlight dot, near the top rim */}
+            <ellipse cx={465} cy={655} rx={15} ry={9} fill="url(#hlDot)" />
           </g>
+          {/* EYES v5-corrected — two horizontal white bars ("=="),
+              ALWAYS upright: they translate and squash with the ball,
+              but NEVER rotate with tilt (there are no spins at all).
+              One shared parameter set, mirrored by construction.
+              No pupils, no happy/sad/wide shapes, no lids, no blue
+              mask — the bars never change shape. Blink = both bars
+              flatten (scaleY -> 0.06) and converge (dx 118 -> ~18)
+              into ONE thin horizontal line, 0.28s (see blinkScaleY).
+              wide/excited only change bar THICKNESS (eyeSY), never
+              the shape. */}
+          {[-EYE_DX, EYE_DX].map((dx) => {
+            const eyeDx = dx * (1 - 0.85 * blinkDepth);
+            const eyeCx = BALL_CX + eyeDx;
+            return (
+              <g
+                key={dx}
+                transform={`translate(${eyeCx + gazeX} ${EYE_Y + gazeY}) scale(${totalEyeSX.toFixed(3)} ${(blink * totalEyeSY).toFixed(3)}) translate(${-eyeCx} ${-EYE_Y})`}
+              >
+                <rect
+                  x={eyeCx - EYE_W / 2}
+                  y={EYE_Y - EYE_BAR_H / 2}
+                  width={EYE_W}
+                  height={EYE_BAR_H}
+                  rx={EYE_BAR_H / 2}
+                  fill="#FFFFFF"
+                />
+              </g>
+            );
+          })}
         </g>
       </g>
     </svg>
