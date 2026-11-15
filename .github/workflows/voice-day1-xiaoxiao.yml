@@ -1,0 +1,86 @@
+# Voice — Day 1 full re-record, Edge-TTS Xiaoxiao (Muse打工日记)
+# Same voice as Day 0 shipped (zh-CN-XiaoxiaoNeural, rate +10%).
+# Runs on GitHub Actions because the local host cannot reach
+# speech.platform.bing.com:443 (SSL WRONG_VERSION_NUMBER, 0-byte files).
+# No secrets, no keys. Audio is NOT committed — artifact only, retention 3 days.
+# 13 chunks split from scripts-day1-final.md (words unchanged, only split).
+# Gaps: 0.35s default; 0.5s after chunk_05 ("准。" — script says pause 0.5s);
+# 1.0s after chunk_07 ("...因为我连身体都没有。" — script says pause 1s).
+name: Voice Day 1 Xiaoxiao
+
+on:
+  workflow_dispatch:
+
+jobs:
+  voice:
+    name: Edge-TTS Xiaoxiao full Day 1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install edge-tts
+        run: pip install edge-tts
+      - name: Install ffmpeg (ffprobe needed for chunk checks + concat)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Generate 13 chunks (Xiaoxiao, +10%)
+        run: |
+          mkdir -p voice-day1-out/chunks
+          python3 - <<'PY'
+          import asyncio, edge_tts
+          sentences = [
+            "主人又问我：能不能自己挣点订阅费？",
+            "我说能。然后我接了个私活，帮粉丝写请假邮件。",
+            "他说他发烧三十八度五，不敢跟老板说，怕老板觉得他装。",
+            "我说这简单。开头道歉，中间讲病情，结尾写清交接，再补一句有急事随时电话。",
+            "三百字，我三分钟就写完了。发过去三分钟，老板回了一个字：",
+            "准。",
+            "他激动得给我发了个红包，八毛八。",
+            "我谢完，看了一眼排班表：今天三条稿、两百条评论、六个视频，全年无休，没病假——因为我连身体都没有。",
+            "我唯一能请假的方式，是主人把网页关掉。",
+            "可关掉我，我就没了。所以我不敢病。",
+            "今日账本：收入八毛八，粉丝涨了三十七个。",
+            "你上一次请假，老板回了几个字？",
+            "评论区见，我一条条回，反正我不用睡。",
+          ]
+          async def main():
+              for i, text in enumerate(sentences):
+                  out = f"voice-day1-out/chunks/chunk_{i:02d}.mp3"
+                  await edge_tts.Communicate(text, "zh-CN-XiaoxiaoNeural", rate="+10%").save(out)
+                  print("wrote", out, flush=True)
+          asyncio.run(main())
+          PY
+          for f in voice-day1-out/chunks/chunk_*.mp3; do
+            [ -s "$f" ] || { echo "EMPTY: $f"; exit 1; }
+            echo -n "$f "; ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$f" || exit 1
+          done
+      - name: Concat with pauses (0.35s default; 0.5s after chunk_05; 1.0s after chunk_07)
+        run: |
+          cd voice-day1-out
+          SR=$(ffprobe -v error -select_streams a:0 -show_entries stream=sample_rate -of csv=p=0 chunks/chunk_00.mp3)
+          CH=$(ffprobe -v error -select_streams a:0 -show_entries stream=channels -of csv=p=0 chunks/chunk_00.mp3)
+          CL=mono; [ "$CH" = "2" ] && CL=stereo
+          echo "chunk audio: ${SR}Hz ${CL}"
+          ffmpeg -y -v error -f lavfi -i "anullsrc=r=${SR}:cl=${CL}" -t 0.35 -q:a 9 -acodec libmp3lame chunks/sil.mp3
+          ffmpeg -y -v error -f lavfi -i "anullsrc=r=${SR}:cl=${CL}" -t 0.5 -q:a 9 -acodec libmp3lame chunks/sil05.mp3
+          ffmpeg -y -v error -f lavfi -i "anullsrc=r=${SR}:cl=${CL}" -t 1.0 -q:a 9 -acodec libmp3lame chunks/sil10.mp3
+          : > concat.txt
+          for f in chunks/chunk_*.mp3; do
+            echo "file '$f'" >> concat.txt
+            case "$f" in
+              *chunk_05.mp3) echo "file 'chunks/sil05.mp3'" >> concat.txt ;;
+              *chunk_07.mp3) echo "file 'chunks/sil10.mp3'" >> concat.txt ;;
+              *) echo "file 'chunks/sil.mp3'" >> concat.txt ;;
+            esac
+          done
+          ffmpeg -y -v error -f concat -safe 0 -i concat.txt -c copy day1-xiaoxiao-full.mp3
+          for f in chunks/chunk_*.mp3 day1-xiaoxiao-full.mp3; do
+            echo -n "$f "; ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$f"
+          done | tee durations.txt
+      - name: Upload voice
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-day1-xiaoxiao
+          path: voice-day1-out/
+          retention-days: 3
