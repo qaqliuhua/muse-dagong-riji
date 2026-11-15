@@ -1,0 +1,72 @@
+# Voice — 医保特辑 full re-record, Edge-TTS Xiaoxiao (Muse打工日记)
+# Same voice as Day 0/Day 1 shipped (zh-CN-XiaoxiaoNeural, rate +10%).
+# Runs on GitHub Actions because the local host cannot reach
+# speech.platform.bing.com:443 (SSL WRONG_VERSION_NUMBER, 0-byte files).
+# No secrets, no keys. Audio is NOT committed — artifact only, retention 3 days.
+# 6 chunks split from scripts-yibao-special.md (words unchanged, only split).
+# Gaps: 0.35s between every chunk (no special pauses in this script).
+name: Voice Yibao Xiaoxiao
+
+on:
+  workflow_dispatch:
+
+jobs:
+  voice:
+    name: Edge-TTS Xiaoxiao full Yibao special
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install edge-tts
+        run: pip install edge-tts
+      - name: Install ffmpeg (ffprobe needed for chunk checks + concat)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Generate 6 chunks (Xiaoxiao, +10%)
+        run: |
+          mkdir -p voice-yibao-out/chunks
+          python3 - <<'PY'
+          import asyncio, edge_tts
+          sentences = [
+            "你去外地看病，医保是不是白交了？我查了一天医保文件，四个事，转给家里人能省钱。",
+            "第一，去外地看病，先在国家医保服务平台上备案。长期住外地的，一次备案长期有效，临时去的至少管六个月，急诊不用备。备了才能直接结算，不用自己先垫钱。",
+            "第二，你医保卡里的钱，现在能跨省给家里人用了。今年十月十六号起，医保钱包升到二点零，全国都能跨省共济，爸妈在老家看病买药，能用你的额度。",
+            "第三，居民医保今年还是四百块一年，国家补七百二十四，比去年多二十四。交一年保一年，不交当年就没待遇。",
+            "第四，千万别断缴。断了再交，要等三个月才能报，断一年多等一个月，这三个月里看病全自费。集中缴费期就这几个月，别拖。",
+            "具体报多少，看你参保地，比例每个城市不一样。你还想知道医保哪一块，评论区告诉我，我一条条查。",
+          ]
+          async def main():
+              for i, text in enumerate(sentences):
+                  out = f"voice-yibao-out/chunks/chunk_{i:02d}.mp3"
+                  await edge_tts.Communicate(text, "zh-CN-XiaoxiaoNeural", rate="+10%").save(out)
+                  print("wrote", out, flush=True)
+          asyncio.run(main())
+          PY
+          for f in voice-yibao-out/chunks/chunk_*.mp3; do
+            [ -s "$f" ] || { echo "EMPTY: $f"; exit 1; }
+            echo -n "$f "; ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$f" || exit 1
+          done
+      - name: Concat with 0.35s pauses
+        run: |
+          cd voice-yibao-out
+          SR=$(ffprobe -v error -select_streams a:0 -show_entries stream=sample_rate -of csv=p=0 chunks/chunk_00.mp3)
+          CH=$(ffprobe -v error -select_streams a:0 -show_entries stream=channels -of csv=p=0 chunks/chunk_00.mp3)
+          CL=mono; [ "$CH" = "2" ] && CL=stereo
+          echo "chunk audio: ${SR}Hz ${CL}"
+          ffmpeg -y -v error -f lavfi -i "anullsrc=r=${SR}:cl=${CL}" -t 0.35 -q:a 9 -acodec libmp3lame chunks/sil.mp3
+          : > concat.txt
+          for f in chunks/chunk_*.mp3; do
+            echo "file '$f'" >> concat.txt
+            echo "file 'chunks/sil.mp3'" >> concat.txt
+          done
+          ffmpeg -y -v error -f concat -safe 0 -i concat.txt -c copy yibao-xiaoxiao-full.mp3
+          for f in chunks/chunk_*.mp3 yibao-xiaoxiao-full.mp3; do
+            echo -n "$f "; ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$f"
+          done | tee durations.txt
+      - name: Upload voice
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-yibao-xiaoxiao
+          path: voice-yibao-out/
+          retention-days: 3
